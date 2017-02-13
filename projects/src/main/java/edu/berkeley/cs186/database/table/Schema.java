@@ -45,11 +45,11 @@ public class Schema {
   public Record verify(List<DataBox> values) throws SchemaException {
     // TODO: implement me!
     if (values.size() != this.fieldTypes.size()) {
-      throw new SchemaException("");
+      throw new SchemaException("The number of DataBoxes in the list does not equal the number of columns in this schema");
     }
     for (int i = 0; i < values.size(); i++) {
-      if (values.get(i).compareTo(this.fieldTypes.get(i) ) != 0) {
-        throw new SchemaException("");
+      if (!values.get(i).type().equals(fieldTypes.get(i).type()) || values.get(i).getSize() != fieldTypes.get(i).getSize()) {
+        throw new SchemaException("The DataBox does not have the same type and size as the columns in this schema");
       }
     }
     return new Record(values);
@@ -66,7 +66,12 @@ public class Schema {
    */
   public byte[] encode(Record record) {
     // TODO: implement me!
-    return null;
+    List<DataBox> values = record.getValues();
+    ByteBuffer bb = ByteBuffer.allocate(this.size);
+    for (DataBox dt : values) {
+       bb.put(dt.getBytes());
+    }
+    return bb.array();
   }
 
   /**
@@ -78,7 +83,28 @@ public class Schema {
    */
   public Record decode(byte[] input) {
     // TODO: implement me!
-    return null;
+    List<DataBox> values = new ArrayList<DataBox>();
+    int s = 0;
+    for (DataBox dt : fieldTypes) {
+      DataBox d;
+      byte[] subByte = Arrays.copyOfRange(input, s, s+ dt.getSize());
+      if (dt.type().equals(DataBox.Types.BOOL)) {
+        d = new BoolDataBox((subByte[0] & 1) == 1);
+      }
+      else if (dt.type().equals(DataBox.Types.INT)) {
+        d = new IntDataBox(ByteBuffer.wrap(subByte).getInt());
+      }
+      else if (dt.type().equals(DataBox.Types.FLOAT)) {
+        d = new FloatDataBox(ByteBuffer.wrap(subByte).getFloat());
+      }
+      else { //String
+        d = new StringDataBox(subByte);
+      }
+      s+= dt.getSize();
+      values.add(d);
+    }
+
+    return new Record(values);
   }
 
   public int getEntrySize() {
