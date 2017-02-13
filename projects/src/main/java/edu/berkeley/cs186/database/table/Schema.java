@@ -44,7 +44,15 @@ public class Schema {
    */
   public Record verify(List<DataBox> values) throws SchemaException {
     // TODO: implement me!
-    return null;
+    if (values.size() != this.fieldTypes.size()) {
+      throw new SchemaException("");
+    }
+    for (int i = 0; i < values.size(); i++) {
+      if (values.get(i).compareTo(this.fieldTypes.get(i) ) != 0) {
+        throw new SchemaException("");
+      }
+    }
+    return new Record(values);
   }
 
   /**
