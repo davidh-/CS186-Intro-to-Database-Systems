@@ -338,6 +338,9 @@ public class TestTable {
     Iterator<Record> iRec = table.iterator();
     for (int i = 0; i < 500; i++) {
       assertTrue(iRec.hasNext());
+      if (i == 288) {
+        int j=0;
+      }
       input.getValues().get(1).setInt(i);
       assertEquals(input, iRec.next());
     }

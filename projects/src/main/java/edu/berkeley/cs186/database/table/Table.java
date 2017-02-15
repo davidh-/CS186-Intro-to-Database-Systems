@@ -154,7 +154,56 @@ public class Table implements Iterable<Record>, Closeable {
    */
   public RecordID addRecord(List<DataBox> values) throws DatabaseException {
     // TODO: implement me!
-    return null;
+    Record r;
+    try {
+      r = schema.verify(values);
+    }
+    catch (SchemaException e) {
+      throw new DatabaseException("Values passed in to this method do not correspond to the schema of this table");
+    }
+    int pageNum;
+    if (!this.freePages.isEmpty()) {
+      pageNum = freePages.first();
+
+    } else {
+      pageNum = allocator.allocPage();
+      freePages.add(pageNum);
+    }
+
+    Page p = allocator.fetchPage(pageNum);
+
+    byte[] header = readPageHeader(p);
+    boolean freeEntry = false;
+    int entryNum = 0;
+    while (entryNum < this.getNumEntriesPerPage() && !freeEntry) {
+      byte b = header[entryNum / 8];
+      int bitOffset = 7 - (entryNum % 8);
+      byte mask = (byte) (1 << bitOffset);
+
+      byte value = (byte) (b & mask);
+      if (value == 0) {
+        int entrySize = this.schema.getEntrySize();
+        int offset = this.pageHeaderSize + (entrySize * entryNum);
+
+        byte[] recordBytes = schema.encode(r);
+        p.writeBytes(offset, entrySize, recordBytes);
+        writeBitToHeader(p, entryNum, (byte) 1);
+
+        freeEntry = true;
+      } else {
+        entryNum++;
+      }
+    }
+
+
+    if(!spaceOnPage(p)) {
+      freePages.remove(pageNum);
+    }
+    this.numRecords += 1;
+    stats.addRecord(r);
+
+    RecordID rid = new RecordID(pageNum, entryNum);
+    return rid;
   }
 
   /**
@@ -167,7 +216,23 @@ public class Table implements Iterable<Record>, Closeable {
    */
   public Record deleteRecord(RecordID rid) throws DatabaseException {
     // TODO: implement me!
-    return null;
+    Page p;
+    try {
+      p = allocator.fetchPage(rid.getPageNum());
+    }
+    catch (PageException e) {
+      throw new DatabaseException("RecordID does not correspond to a valid record");
+    }
+    byte[] b = p.readBytes(pageHeaderSize + schema.getEntrySize()*rid.getEntryNumber(), schema.getEntrySize());
+    p.writeBytes(pageHeaderSize + schema.getEntrySize()*rid.getEntryNumber(), schema.getEntrySize(), new byte[schema.getEntrySize()]);
+    writeBitToHeader(p, rid.getEntryNumber(), (byte) 0);
+
+    freePages.add(rid.getPageNum());
+    this.numRecords -= 1;
+    Record r = schema.decode(b);
+    stats.removeRecord(r);
+
+    return r;
   }
 
   /**
@@ -179,7 +244,15 @@ public class Table implements Iterable<Record>, Closeable {
    */
   public Record getRecord(RecordID rid) throws DatabaseException {
     // TODO: implement me!
-    return null;
+    Page p;
+    try {
+      p = allocator.fetchPage(rid.getPageNum());
+    }
+    catch (PageException e) {
+      throw new DatabaseException("RecordID does not correspond to a valid record");
+    }
+    byte[] b = p.readBytes(pageHeaderSize + schema.getEntrySize()*rid.getEntryNumber(), schema.getEntrySize());
+    return schema.decode(b);
   }
 
   /**
@@ -193,8 +266,31 @@ public class Table implements Iterable<Record>, Closeable {
    *         if the values do not correspond to the schema of this table
    */
   public Record updateRecord(List<DataBox> values, RecordID rid) throws DatabaseException {
-    // TODO: implement me!
-    return null;
+    // TODO: implement me!\
+    Record r;
+    try {
+      r = schema.verify(values);
+    }
+    catch (SchemaException e) {
+      throw new DatabaseException("Values passed in to this method do not correspond to the schema of this table");
+    }
+    Page p;
+    try {
+      p = allocator.fetchPage(rid.getPageNum());
+    }
+    catch (PageException e) {
+      throw new DatabaseException("RecordID does not correspond to a valid record");
+    }
+    byte[] b = p.readBytes(pageHeaderSize + schema.getEntrySize()*rid.getEntryNumber(), schema.getEntrySize());
+    Record r_old = schema.decode(b);
+    stats.removeRecord(r_old);
+
+
+    byte[] recordBytes = schema.encode(r);
+    p.writeBytes(pageHeaderSize + schema.getEntrySize()*rid.getEntryNumber(), schema.getEntrySize(), recordBytes);
+    stats.addRecord(r);
+
+    return r_old;
   }
 
   public int getNumEntriesPerPage() {
@@ -216,7 +312,22 @@ public class Table implements Iterable<Record>, Closeable {
    */
   private boolean checkRecordIDValidity(RecordID rid) throws DatabaseException {
     // TODO: implement me!
-    return false;
+    if(rid.getPageNum() == 0) {
+      return false;
+    }
+    Page p;
+    try {
+      p = allocator.fetchPage(rid.getPageNum());
+    }
+    catch (PageException e) {
+      throw new DatabaseException("RecordID does not reference an existing data page slot");
+    }
+    if (readPageHeader(p)[rid.getEntryNumber()] == 1) {
+      return true;
+    }
+    else {
+      return false;
+    }
   }
 
   /**
@@ -230,6 +341,8 @@ public class Table implements Iterable<Record>, Closeable {
    */
   private void setEntryCounts() {
     // TODO: implement me!
+    this.pageHeaderSize = (int) (Page.pageSize/(schema.getEntrySize() + (float) 1/8))/8;
+    this.numEntriesPerPage = pageHeaderSize * 8;
   }
 
   /**
@@ -246,7 +359,6 @@ public class Table implements Iterable<Record>, Closeable {
         return true;
       }
     }
-
     return false;
   }
 
@@ -401,8 +513,25 @@ public class Table implements Iterable<Record>, Closeable {
    */
   private class TableIterator implements Iterator<Record> {
 
+    private Iterator<Page> pIter;
+    private Page p;
+    private byte[] header;
+
+    private int entryNum;
+    private int numRecsSeen;
     public TableIterator() {
       // TODO: implement me!
+      this.pIter = allocator.iterator();
+      pIter.next();
+      if (!pIter.hasNext()) {
+        allocator.allocPage();
+      }
+      this.p = pIter.next();
+      this.header = readPageHeader(p);
+
+
+      this.entryNum = 0;
+      this.numRecsSeen = 0;
     }
 
     /**
@@ -411,8 +540,7 @@ public class Table implements Iterable<Record>, Closeable {
      * @return true if this iterator has another record to yield, otherwise false
      */
     public boolean hasNext() {
-      // TODO: implement me!
-      return false;
+      return numRecsSeen < numRecords;
     }
 
     /**
@@ -422,8 +550,40 @@ public class Table implements Iterable<Record>, Closeable {
      * @throws NoSuchElementException if there are no more Records to yield
      */
     public Record next() {
-      // TODO: implement me!
-      return null;
+      // add all records in this page to TableStats
+      int j = getNumEntriesPerPage();
+      while (entryNum <= getNumEntriesPerPage()) {
+        if(entryNum == getNumEntriesPerPage()) {
+          if (pIter.hasNext()) {
+            p = pIter.next();
+            header = readPageHeader(p);
+
+            entryNum = 0;
+          }
+          else {
+            throw new NoSuchElementException("There are no more pages to yield");
+          }
+        }
+
+        byte b = header[entryNum/8];
+        int bitOffset = 7 - (entryNum % 8);
+        byte mask = (byte) (1 << bitOffset);
+
+        byte value = (byte) (b & mask);
+        if (value != 0) {
+          int entrySize = schema.getEntrySize();
+
+          int offset = pageHeaderSize + (entrySize * entryNum);
+          byte[] bytes = p.readBytes(offset, entrySize);
+
+          Record record = schema.decode(bytes);
+          entryNum++;
+          numRecsSeen++;
+          return record;
+        }
+        entryNum++;
+      }
+      throw new NoSuchElementException("There are no more records to yield");
     }
 
     public void remove() {
