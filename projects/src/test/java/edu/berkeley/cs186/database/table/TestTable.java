@@ -61,6 +61,96 @@ public class TestTable {
   }
 
   @Test
+  @Category(StudentTest.class)
+  public void testTableNumEntriesInt() throws DatabaseException {
+
+    Schema intSchema = TestUtils.createSchemaWithTwoInts();
+    Table intTable = createTestTable(intSchema, "intTable");
+    int numEntries = intTable.getNumEntriesPerPage();
+    intTable.close();
+    assertEquals("NumEntries per page is incorrect", 504, numEntries);
+  }
+
+  @Test(expected = DatabaseException.class)
+  @Category(StudentTest.class)
+  public void testInvalidInsert() throws DatabaseException {
+    Record input = TestUtils.createRecordWithAllTypes();
+    List<DataBox> v = input.getValues();
+    v.add(0, v.get(1));
+    v.add(2, v.get(3));
+    table.addRecord(input.getValues());
+  }
+
+  @Test(expected = DatabaseException.class)
+  @Category(StudentTest.class)
+  public void testInvalidRemove() throws DatabaseException {
+    table.deleteRecord(new RecordID(1, 1));
+  }
+
+  @Test
+  @Category(StudentTest.class)
+  public void testTableSimpleRemove() throws DatabaseException {
+    Record input = TestUtils.createRecordWithAllTypes();
+
+    RecordID rid = table.addRecord(input.getValues());
+
+    // This is a new table, so it should be put into the first slot of the first page.
+    assertEquals(1, rid.getPageNum());
+    assertEquals(0, rid.getEntryNumber());
+
+    Record output = table.deleteRecord(rid);
+    assertEquals(input, output);
+  }
+
+  @Test(expected = DatabaseException.class)
+  @Category(StudentTest.class)
+  public void testInvalidUpdate() throws DatabaseException {
+    Record input = TestUtils.createRecordWithAllTypes();
+    table.updateRecord(input.getValues(), new RecordID(1, 1));
+  }
+
+  @Test()
+  @Category(StudentTest.class)
+  public void testAllThreeAtOnce() throws DatabaseException {
+    Record input = TestUtils.createRecordWithAllTypes();
+    Record input2 = createRecordWithAllTypes2();
+    RecordID rid = table.addRecord(input.getValues());
+    RecordID rid2 = table.addRecord(input2.getValues());
+
+    Record output = table.updateRecord(createRecordWithAllTypes2().getValues(), rid);
+    Record output2 = table.deleteRecord(rid2);
+    assertEquals(input, output);
+    assertNotEquals(input, table.getRecord(rid));
+    assertNotEquals(output, output2);
+  }
+
+
+  public static Record createRecordWithAllTypes2() {
+    List<DataBox> dataValues = new ArrayList<DataBox>();
+    dataValues.add(new BoolDataBox(false));
+    dataValues.add(new IntDataBox(2));
+    dataValues.add(new StringDataBox("abcde", 5));
+    dataValues.add(new FloatDataBox((float) 1.2));
+
+    return new Record(dataValues);
+  }
+
+
+  @Test
+  @Category(StudentTest.class)
+  public void testTableSimpleUpdate() throws DatabaseException {
+    Record input = TestUtils.createRecordWithAllTypes();
+
+    RecordID rid = table.addRecord(input.getValues());
+
+    Record output = table.updateRecord(createRecordWithAllTypes2().getValues(), rid);
+
+    assertEquals(input, output);
+    assertNotEquals(input, table.getRecord(rid));
+  }
+
+
+  @Test
   public void testTableNumEntries() throws DatabaseException {
     assertEquals("NumEntries per page is incorrect", 288, this.table.getNumEntriesPerPage());
   }
