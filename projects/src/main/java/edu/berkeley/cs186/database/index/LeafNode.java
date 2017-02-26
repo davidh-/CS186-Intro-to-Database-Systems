@@ -47,7 +47,14 @@ public class LeafNode extends BPlusNode {
     @Override
     public InnerEntry insertBEntry(LeafEntry ent) {
         // Implement me!
-        return null;
+        List<BEntry> root = this.getAllValidEntries();
+        if (this.hasSpace()) {
+            root.add(ent);
+            this.overwriteBNodeEntries(root);
+            return null;
+        } else {
+            return this.splitNode(ent);
+        }
     }
 
     /**
@@ -63,7 +70,19 @@ public class LeafNode extends BPlusNode {
     @Override
     public InnerEntry splitNode(BEntry newEntry) {
         // Implement me!
-        return null;
+        List<BEntry> validEntries = getAllValidEntries();
+
+        validEntries.add(newEntry);
+        Collections.sort(validEntries);
+
+        int d = this.numEntries;
+        List<BEntry> left = validEntries.subList(0, d/2);
+        List<BEntry> right = validEntries.subList(d/2, d);
+
+        LeafNode newNode = new LeafNode(this.getTree());
+        newNode.overwriteBNodeEntries(right);
+        this.overwriteBNodeEntries(left);
+        return (InnerEntry) right.get(0);
     }
 
 

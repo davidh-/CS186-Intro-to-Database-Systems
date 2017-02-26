@@ -129,6 +129,7 @@ public class BPlusTree {
      */
     public void insertKey(DataBox key, RecordID rid) {
         // Implement me!
+        int i = 1;
     }
 
     /**
