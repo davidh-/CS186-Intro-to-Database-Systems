@@ -129,7 +129,15 @@ public class BPlusTree {
      */
     public void insertKey(DataBox key, RecordID rid) {
         // Implement me!
-        int i = 1;
+        BPlusNode root = BPlusNode.getBPlusNode(this, rootPageNum);
+        InnerEntry result = root.insertBEntry(new LeafEntry(key, rid));
+        if(result != null) {
+            BPlusNode newRoot = new InnerNode(this);
+            List<BEntry> entries = new ArrayList<BEntry>();
+            entries.add(result);
+            newRoot.overwriteBNodeEntries(entries);
+            updateRoot(newRoot.getPageNum());
+        }
     }
 
     /**

@@ -82,7 +82,8 @@ public class LeafNode extends BPlusNode {
         LeafNode newNode = new LeafNode(this.getTree());
         newNode.overwriteBNodeEntries(right);
         this.overwriteBNodeEntries(left);
-        return (InnerEntry) right.get(0);
+        BEntry up = right.get(0);
+        return new InnerEntry(up.getKey(), newNode.getPageNum());
     }
 
 
