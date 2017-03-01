@@ -239,6 +239,29 @@ public class BPlusTree {
     private class BPlusIterator implements Iterator<RecordID> {
         // Implement me!
 
+        private void recurse(BPlusNode node, DataBox key, boolean scan, boolean all) {
+            if (node.isLeaf()) {
+                Iterator<RecordID> iter;
+                if (all) {
+                    iter = ((LeafNode) node).scan();
+                } else if (scan) {
+                    iter = ((LeafNode) node).scanFrom(key);
+                } else {
+                    iter = ((LeafNode) node).scanForKey(key);
+                }
+                while(iter.hasNext()) {
+                    stack.add(iter.next());
+                }
+            }
+            else {
+                List<BEntry> entries = node.getAllValidEntries();
+                for (BEntry e : entries) {
+                    BPlusNode newNode = BPlusNode.getBPlusNode(node.getTree(), e.getPageNum());
+                    recurse(newNode, key, scan, all);
+                }
+            }
+        }
+        private Stack<RecordID> stack = new Stack<RecordID>();
         /**
          * Construct an iterator that performs a sorted scan on this BPlusTree
          * tree.
@@ -248,7 +271,7 @@ public class BPlusTree {
          * @param root the root node of this BPlusTree
          */
         public BPlusIterator(BPlusNode root) {
-            // Implement me!
+            recurse(root, null, false, true);
         }
 
         /**
@@ -265,6 +288,7 @@ public class BPlusTree {
          */
         public BPlusIterator(BPlusNode root, DataBox key, boolean scan) {
             // Implement me!
+            recurse(root, key, scan, false);
         }
 
         /**
@@ -275,7 +299,7 @@ public class BPlusTree {
          */
         public boolean hasNext() {
             // Implement me!
-            return false;
+            return !stack.empty();
         }
 
         /**
@@ -287,7 +311,7 @@ public class BPlusTree {
          */
         public RecordID next() {
             // Implement me!
-            return null;
+            return stack.pop();
         }
 
         public void remove() {
