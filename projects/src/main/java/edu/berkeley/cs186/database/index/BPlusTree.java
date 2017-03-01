@@ -7,6 +7,8 @@ import edu.berkeley.cs186.database.databox.*;
 
 import java.util.*;
 import java.nio.file.Paths;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * A B+ tree. Allows the user to add, delete, search, and scan for keys in an
@@ -250,7 +252,7 @@ public class BPlusTree {
                     iter = ((LeafNode) node).scanForKey(key);
                 }
                 while(iter.hasNext()) {
-                    stack.add(iter.next());
+                    queue.add(iter.next());
                 }
             }
             else {
@@ -261,7 +263,7 @@ public class BPlusTree {
                 }
             }
         }
-        private Stack<RecordID> stack = new Stack<RecordID>();
+        private Queue<RecordID> queue = new LinkedBlockingDeque<RecordID>();
         /**
          * Construct an iterator that performs a sorted scan on this BPlusTree
          * tree.
@@ -299,7 +301,7 @@ public class BPlusTree {
          */
         public boolean hasNext() {
             // Implement me!
-            return !stack.empty();
+            return !queue.isEmpty();
         }
 
         /**
@@ -311,7 +313,7 @@ public class BPlusTree {
          */
         public RecordID next() {
             // Implement me!
-            return stack.pop();
+            return queue.remove();
         }
 
         public void remove() {
