@@ -50,6 +50,7 @@ public class LeafNode extends BPlusNode {
         List<BEntry> root = this.getAllValidEntries();
         if (this.hasSpace()) {
             root.add(ent);
+            Collections.sort(root);
             this.overwriteBNodeEntries(root);
             return null;
         } else {
@@ -75,7 +76,7 @@ public class LeafNode extends BPlusNode {
         validEntries.add(newEntry);
         Collections.sort(validEntries);
 
-        int d = this.numEntries;
+        int d = this.numEntries+1;
         List<BEntry> left = validEntries.subList(0, d/2);
         List<BEntry> right = validEntries.subList(d/2, d);
 
@@ -119,6 +120,7 @@ public class LeafNode extends BPlusNode {
                 rids.add(le.getRecordID());
             }
         }
+
         return rids.iterator();
     }
 

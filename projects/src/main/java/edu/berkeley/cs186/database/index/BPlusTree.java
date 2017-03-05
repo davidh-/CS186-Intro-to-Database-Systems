@@ -135,6 +135,7 @@ public class BPlusTree {
         InnerEntry result = root.insertBEntry(new LeafEntry(key, rid));
         if(result != null) {
             BPlusNode newRoot = new InnerNode(this);
+            ((InnerNode)newRoot).setFirstChild(root.getPageNum());
             List<BEntry> entries = new ArrayList<BEntry>();
             entries.add(result);
             newRoot.overwriteBNodeEntries(entries);
@@ -255,7 +256,9 @@ public class BPlusTree {
                     queue.add(iter.next());
                 }
             }
+
             else {
+                recurse(BPlusNode.getBPlusNode(node.getTree(), ((InnerNode) node).getFirstChild()), null, false, true);
                 List<BEntry> entries = node.getAllValidEntries();
                 for (BEntry e : entries) {
                     BPlusNode newNode = BPlusNode.getBPlusNode(node.getTree(), e.getPageNum());

@@ -74,20 +74,21 @@ public class InnerNode extends BPlusNode {
     public InnerEntry insertBEntry(LeafEntry ent) {
         // Implement me!
         List<BEntry> entries = this.getAllValidEntries();
-        BEntry result = null;
-        for(BEntry e : entries) {
-            if (ent.compareTo(e) < 0) {
-                BPlusNode node = getBPlusNode(this.getTree(), findChildFromKey(e.getKey()));
-                result = node.insertBEntry(ent);
-                break;
-            }
-        }
-        if (this.hasSpace()) {
-            entries.add(result);
-            this.overwriteBNodeEntries(entries);
+
+        BPlusNode childNode = getBPlusNode(this.getTree(), findChildFromKey(ent.getKey()));
+        BEntry result = childNode.insertBEntry(ent);
+
+        if (result == null) {
             return null;
-        } else {
-            return this.splitNode(ent);
+        }
+        else {
+            if (this.hasSpace()) {
+                entries.add(result);
+                this.overwriteBNodeEntries(entries);
+                return null;
+            } else {
+                return this.splitNode(result);
+            }
         }
     }
 
@@ -105,20 +106,26 @@ public class InnerNode extends BPlusNode {
     public InnerEntry splitNode(BEntry newEntry) {
         // Implement me!
         List<BEntry> validEntries = getAllValidEntries();
-
-
-        int d = this.numEntries;
-        List<BEntry> left = validEntries.subList(0, d/2);
-        List<BEntry> right = validEntries.subList((d/2)+1, d-1);
-
-        InnerNode newNode = new InnerNode(this.getTree());
-        newNode.overwriteBNodeEntries(right);
-
-        BEntry removed = validEntries.remove((d/2)-1);
         validEntries.add(newEntry);
         Collections.sort(validEntries);
-        this.overwriteBNodeEntries(left);
 
-        return (InnerEntry) removed;
+        int d = this.numEntries;
+        BEntry removed = validEntries.remove((d+1/2));
+
+
+        List<BEntry> left = validEntries.subList(0, d/2);
+        List<BEntry> right = validEntries.subList(d/2, d);
+
+        InnerNode newNode = new InnerNode(this.getTree());
+
+
+        newNode.overwriteBNodeEntries(right);
+        newNode.setFirstChild(removed.getPageNum());
+
+
+        this.overwriteBNodeEntries(left);
+        this.setFirstChild(left.get(0).getPageNum());
+
+        return new InnerEntry(removed.getKey(), removed.getPageNum());
     }
 }
