@@ -37,14 +37,185 @@ public class TestLargeBPlusTree {
         this.bp = new BPlusTree(new IntDataBox(), testFile, tempFolderPath);
     }
 
-    /**     
-    * Test sample, do not modify.        
-    */
+
     @Test
     @Category(StudentTestP2.class)
-    public void testSample() {
-        assertEquals(true, true); // Do not actually write a test like this!
+    public void testInnerNodeInsertBEntry25() {
+        for (int i = 25; i > 0; i--) {
+            bp.insertKey(new IntDataBox(i), new RecordID(i,0));
+        }
+
+        Iterator<RecordID> rids = bp.sortedScan();
+        int expectedPageNum = 1;
+        while (rids.hasNext()) {
+            assertEquals(expectedPageNum, rids.next().getPageNum());
+            expectedPageNum++;
+        }
     }
+
+
+    @Test
+    @Category(StudentTestP2.class)
+    public void testLeafNodeInsertBEntry100() {
+        for (int i = 100; i > 0; i--) {
+            bp.insertKey(new IntDataBox(i), new RecordID(i,0));
+        }
+        Iterator<RecordID> rids = bp.sortedScan();
+        int expectedPageNum = 1;
+        while (rids.hasNext()) {
+            assertEquals(expectedPageNum, rids.next().getPageNum());
+            expectedPageNum++;
+        }
+    }
+
+
+    @Test
+    @Category(StudentTestP2.class)
+    public void testInnerNodeSplit() {
+        /** Insert records to separate pages in decreasing pageNum order. */
+        for (int i = 10000; i > 0; i--) {
+            bp.insertKey(new IntDataBox(i), new RecordID(i,0));
+        }
+        Iterator<RecordID> rids = bp.sortedScan();
+        int expectedPageNum = 1;
+        while (rids.hasNext()) {
+            assertEquals(expectedPageNum, rids.next().getPageNum());
+            expectedPageNum++;
+        }
+    }
+
+
+    @Test
+    @Category(StudentTestP2.class)
+    public void testLeafNodeSplit() {
+        for (int i = 1000; i > 0; i--) {
+            bp.insertKey(new IntDataBox(i), new RecordID(i,0));
+        }
+        Iterator<RecordID> rids = bp.sortedScan();
+        int expectedPageNum = 1;
+        while (rids.hasNext()) {
+            assertEquals(expectedPageNum, rids.next().getPageNum());
+            expectedPageNum++;
+        }
+    }
+
+    @Test
+    @Category(StudentTestP2.class)
+    public void testLookupKey() {
+        for (int i = 1000; i > 0; i--) {
+            bp.insertKey(new IntDataBox(i), new RecordID(i,0));
+        }
+        assertTrue(bp.containsKey(new IntDataBox(1000)));
+    }
+
+
+    @Test
+    @Category(StudentTestP2.class)
+    public void testSortedScanFrom() {
+        for (int i = 1000; i >= 0; i--) {
+            bp.insertKey(new IntDataBox(i), new RecordID(i,0));
+        }
+        Iterator<RecordID> rids = bp.sortedScanFrom(new IntDataBox(500));
+        int expectedPageNum = 500;
+        while (rids.hasNext()) {
+            assertEquals(expectedPageNum, rids.next().getPageNum());
+            expectedPageNum++;
+        }
+        assertEquals(1001, expectedPageNum);
+        assertEquals(5, this.bp.getNumNodes());
+    }
+
+    @Test
+    @Category(StudentTestP2.class)
+    public void testsortedScan() {
+        for (int i = 0; i < 10*intLeafPageSize + 1; i++) {
+            bp.insertKey(new IntDataBox(i % 10), new RecordID(i % 10, i));
+        }
+
+        assertEquals(17, this.bp.getNumNodes());
+
+        Iterator<RecordID> rids = bp.sortedScan();
+        assertTrue(rids.hasNext());
+
+        for (int i = 0; i < intLeafPageSize + 1; i++) {
+            assertTrue(rids.hasNext());
+            RecordID rid = rids.next();
+            assertEquals(0, rid.getPageNum());
+            assertEquals(i * 10, rid.getEntryNumber());
+        }
+
+    }
+
+    @Test
+    @Category(StudentTestP2.class)
+    public void testScanForKeysStillLeft() {
+        for (int i = 0; i < 16*intLeafPageSize; i++) {
+            bp.insertKey(new IntDataBox(i % 8), new RecordID(i % 8, i));
+        }
+
+        assertEquals(29, this.bp.getNumNodes());
+
+        Iterator<RecordID> rids;
+
+        rids = bp.lookupKey(new IntDataBox(0));
+        System.out.println(rids);
+
+        assertTrue(rids.hasNext());
+
+    }
+
+    @Test
+    @Category(StudentTestP2.class)
+    public void testScans() {
+        for (int i = 0; i < 69*intLeafPageSize + 1; i++) {
+            bp.insertKey(new IntDataBox(i % 69), new RecordID(i % 69, i));
+        }
+
+        assertEquals(119, this.bp.getNumNodes());
+
+        Iterator<RecordID> rids = bp.sortedScan();
+        assertTrue(rids.hasNext());
+
+        for (int i = 0; i < intLeafPageSize + 1; i++) {
+            assertTrue(rids.hasNext());
+            RecordID rid = rids.next();
+            assertEquals(0, rid.getPageNum());
+            assertEquals(i * 69, rid.getEntryNumber());
+        }
+
+    }
+
+    @Test
+    @Category(StudentTestP2.class)
+    public void testScansMultipleInserts() {
+
+        for (int i = 0; i < 100*intLeafPageSize; i++) {
+            bp.insertKey(new IntDataBox(i % 50), new RecordID(i % 50, i));
+        }
+
+        assertEquals(165, this.bp.getNumNodes());
+
+        for (int k = 0; k < 50; k++) {
+            Iterator<RecordID> rids = bp.sortedScanFrom(new IntDataBox(k));
+            assertTrue(rids.hasNext());
+            for (int i = k; i < 50; i++) {
+                for (int j = 0; j < 2*intLeafPageSize; j++) {
+                    assertTrue(rids.hasNext());
+                    RecordID rid = rids.next();
+                    assertEquals(i, rid.getPageNum());
+                }
+            }
+            assertFalse(rids.hasNext());
+        }
+
+    }
+
+
+
+
+
+
+
 
     @Test
     public void testBPlusTreeInsert() {
