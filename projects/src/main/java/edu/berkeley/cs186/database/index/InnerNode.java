@@ -84,6 +84,7 @@ public class InnerNode extends BPlusNode {
         else {
             if (this.hasSpace()) {
                 entries.add(result);
+                Collections.sort(entries);
                 this.overwriteBNodeEntries(entries);
                 return null;
             } else {
@@ -110,7 +111,7 @@ public class InnerNode extends BPlusNode {
         Collections.sort(validEntries);
 
         int d = this.numEntries;
-        BEntry removed = validEntries.remove((d+1/2));
+        BEntry removed = validEntries.remove(((d+1)/2));
 
 
         List<BEntry> left = validEntries.subList(0, d/2);
@@ -126,6 +127,6 @@ public class InnerNode extends BPlusNode {
         this.overwriteBNodeEntries(left);
         this.setFirstChild(left.get(0).getPageNum());
 
-        return new InnerEntry(removed.getKey(), removed.getPageNum());
+        return new InnerEntry(removed.getKey(), newNode.getPageNum());
     }
 }

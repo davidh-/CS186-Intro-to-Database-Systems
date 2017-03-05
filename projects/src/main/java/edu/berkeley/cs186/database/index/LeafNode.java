@@ -76,13 +76,15 @@ public class LeafNode extends BPlusNode {
         validEntries.add(newEntry);
         Collections.sort(validEntries);
 
-        int d = this.numEntries+1;
+        int d = this.numEntries + 1;
         List<BEntry> left = validEntries.subList(0, d/2);
         List<BEntry> right = validEntries.subList(d/2, d);
 
         LeafNode newNode = new LeafNode(this.getTree());
+
         newNode.overwriteBNodeEntries(right);
         this.overwriteBNodeEntries(left);
+
         BEntry up = right.get(0);
         return new InnerEntry(up.getKey(), newNode.getPageNum());
     }
