@@ -53,15 +53,16 @@ public class InnerNode extends BPlusNode {
      * contains the given key
      */
     public int findChildFromKey(DataBox key) {
-        int keyPage = getFirstChild();  // Default keyPage
-        List<BEntry> entries = getAllValidEntries();
-        for (BEntry ent : entries) {
-            if (key.compareTo(ent.getKey()) < 0) {
+        int childToTraverse = getFirstChild();
+        List<BEntry> validEntries = getAllValidEntries();
+        for (BEntry entry : validEntries) {
+            if (key.compareTo(entry.getKey()) < 0) {
                 break;
+            } else {
+                childToTraverse = entry.getPageNum();
             }
-            keyPage = ent.getPageNum();
         }
-        return keyPage;
+        return childToTraverse;
     }
 
     /**
@@ -72,24 +73,22 @@ public class InnerNode extends BPlusNode {
      * as a result of this InnerNode being split, null otherwise
      */
     public InnerEntry insertBEntry(LeafEntry ent) {
-        // Implement me!
-        List<BEntry> entries = this.getAllValidEntries();
+        int childPageNum = findChildFromKey(ent.getKey());
+        BPlusNode childNode = getBPlusNode(getTree(), childPageNum);
+        InnerEntry pushedEntry = childNode.insertBEntry(ent);
 
-        BPlusNode childNode = getBPlusNode(this.getTree(), findChildFromKey(ent.getKey()));
-        BEntry result = childNode.insertBEntry(ent);
-
-        if (result == null) {
-            return null;
-        }
-        else {
-            if (this.hasSpace()) {
-                entries.add(result);
-                Collections.sort(entries);
-                this.overwriteBNodeEntries(entries);
+        if (pushedEntry != null) {
+            if (hasSpace()) {
+                List<BEntry> validEntries = getAllValidEntries();
+                validEntries.add(pushedEntry);
+                Collections.sort(validEntries);
+                overwriteBNodeEntries(validEntries);
                 return null;
             } else {
-                return this.splitNode(result);
+                return splitNode(pushedEntry);
             }
+        } else {
+            return null;
         }
     }
 
@@ -105,28 +104,22 @@ public class InnerNode extends BPlusNode {
      */
     @Override
     public InnerEntry splitNode(BEntry newEntry) {
-        // Implement me!
         List<BEntry> validEntries = getAllValidEntries();
         validEntries.add(newEntry);
         Collections.sort(validEntries);
 
-        int d = this.numEntries;
-        BEntry removed = validEntries.remove(((d+1)/2));
+        List<BEntry> leftNodeEntries = validEntries.subList(0, validEntries.size()/2);
+        BEntry middleEntry = validEntries.get(validEntries.size()/2);
+        List<BEntry> rightNodeEntries = validEntries.subList(validEntries.size()/2 + 1, validEntries.size());
 
+        overwriteBNodeEntries(leftNodeEntries);
 
-        List<BEntry> left = validEntries.subList(0, d/2);
-        List<BEntry> right = validEntries.subList(d/2, d);
+        InnerNode rightNode = new InnerNode(getTree());
+        rightNode.setFirstChild(middleEntry.getPageNum());
+        rightNode.overwriteBNodeEntries(rightNodeEntries);
 
-        InnerNode newNode = new InnerNode(this.getTree());
+        InnerEntry newMiddleEntry = new InnerEntry(middleEntry.getKey(), rightNode.getPageNum());
 
-
-        newNode.overwriteBNodeEntries(right);
-        newNode.setFirstChild(removed.getPageNum());
-
-
-        this.overwriteBNodeEntries(left);
-        this.setFirstChild(left.get(0).getPageNum());
-
-        return new InnerEntry(removed.getKey(), newNode.getPageNum());
+        return newMiddleEntry;
     }
 }

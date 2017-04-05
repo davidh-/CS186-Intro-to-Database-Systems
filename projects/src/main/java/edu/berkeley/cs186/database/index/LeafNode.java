@@ -46,15 +46,14 @@ public class LeafNode extends BPlusNode {
      */
     @Override
     public InnerEntry insertBEntry(LeafEntry ent) {
-        // Implement me!
-        List<BEntry> root = this.getAllValidEntries();
-        if (this.hasSpace()) {
-            root.add(ent);
-            Collections.sort(root);
-            this.overwriteBNodeEntries(root);
+        if (hasSpace()) {
+            List<BEntry> validEntries = getAllValidEntries();
+            validEntries.add(ent);
+            Collections.sort(validEntries);
+            overwriteBNodeEntries(validEntries);
             return null;
         } else {
-            return this.splitNode(ent);
+            return splitNode(ent);
         }
     }
 
@@ -70,23 +69,22 @@ public class LeafNode extends BPlusNode {
      */
     @Override
     public InnerEntry splitNode(BEntry newEntry) {
-        // Implement me!
         List<BEntry> validEntries = getAllValidEntries();
-
         validEntries.add(newEntry);
         Collections.sort(validEntries);
 
-        int d = this.numEntries + 1;
-        List<BEntry> left = validEntries.subList(0, d/2);
-        List<BEntry> right = validEntries.subList(d/2, d);
+        List<BEntry> leftNodeEntries = validEntries.subList(0, validEntries.size()/2);
+        BEntry middleEntry = validEntries.get(validEntries.size()/2);
+        List<BEntry> rightNodeEntries = validEntries.subList(validEntries.size()/2, validEntries.size());
 
-        LeafNode newNode = new LeafNode(this.getTree());
+        overwriteBNodeEntries(leftNodeEntries);
 
-        newNode.overwriteBNodeEntries(right);
-        this.overwriteBNodeEntries(left);
+        LeafNode rightNode = new LeafNode(getTree());
+        rightNode.overwriteBNodeEntries(rightNodeEntries);
 
-        BEntry up = right.get(0);
-        return new InnerEntry(up.getKey(), newNode.getPageNum());
+        InnerEntry newMiddleEntry = new InnerEntry(middleEntry.getKey(), rightNode.getPageNum());
+
+        return newMiddleEntry;
     }
 
 
@@ -122,7 +120,6 @@ public class LeafNode extends BPlusNode {
                 rids.add(le.getRecordID());
             }
         }
-
         return rids.iterator();
     }
 
