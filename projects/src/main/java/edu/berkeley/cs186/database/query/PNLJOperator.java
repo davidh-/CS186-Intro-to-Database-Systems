@@ -5,6 +5,7 @@ import edu.berkeley.cs186.database.DatabaseException;
 import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.io.Page;
 import edu.berkeley.cs186.database.table.Record;
+import edu.berkeley.cs186.database.table.Table;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -50,6 +51,7 @@ public class PNLJOperator extends JoinOperator {
     private int leftEntryNum;
     private int rightEntryNum;
 
+
     public PNLJIterator() throws QueryPlanException, DatabaseException {
       /* Suggested Starter Code: get table names. */
       if (PNLJOperator.this.getLeftSource().isSequentialScan()) {
@@ -73,20 +75,136 @@ public class PNLJOperator extends JoinOperator {
         }
       }
       /* TODO */
+      this.leftIterator = PNLJOperator.this.getPageIterator(this.leftTableName);
+      this.rightIterator = PNLJOperator.this.getPageIterator(this.rightTableName);
+
+      this.leftIterator.next();
+      this.rightIterator.next();
+      this.leftPage = this.leftIterator.next();
+      this.rightPage = this.rightIterator.next();
+
+      this.leftHeader = PNLJOperator.this.getPageHeader(this.leftTableName, this.leftPage);
+      this.rightHeader = PNLJOperator.this.getPageHeader(this.rightTableName, this.rightPage);
+
+
+      this.leftEntryNum = 0;
+      this.rightEntryNum = 0;
+      this.nextRecord = null;
+      this.leftRecord = getNextLeftRecordInPage();
+      this.rightRecord = getNextRightRecordInPage();
     }
 
     public boolean hasNext() {
       /* TODO */
-      return false;
+      if (this.nextRecord != null) {
+        return true;
+      }
+      
+      while (true) {
+        if (this.leftRecord == null) {
+          this.leftRecord = getNextLeftRecordInPage();
+          if (this.leftRecord == null) {
+            return false;
+          } else {
+            try {
+              this.rightHeader = PNLJOperator.this.getPageHeader(this.rightTableName, this.rightPage);
+            } catch (DatabaseException e) {
+              e.printStackTrace();
+            }
+          }
+        }
+        DataBox leftJoinValue = this.leftRecord.getValues().get(PNLJOperator.this.getLeftColumnIndex());
+        DataBox rightJoinValue = this.rightRecord.getValues().get(PNLJOperator.this.getRightColumnIndex());
+        if (leftJoinValue.equals(rightJoinValue)) {
+          List<DataBox> leftValues = new ArrayList<DataBox>(this.leftRecord.getValues());
+          List<DataBox> rightValues = new ArrayList<DataBox>(rightRecord.getValues());
+          leftValues.addAll(rightValues);
+          this.nextRecord = new Record(leftValues);
+          this.rightRecord = getNextRightRecordInPage();
+          return true;
+        }
+        this.rightRecord = getNextRightRecordInPage();
+      }
+
     }
 
     private Record getNextLeftRecordInPage() {
       /* TODO */
+      try {
+
+        while (this.leftEntryNum < PNLJOperator.this.getNumEntriesPerPage(leftTableName)) {
+          byte b = this.leftHeader[this.leftEntryNum / 8];
+          int bitOffset = 7 - (this.leftEntryNum % 8);
+          byte mask = (byte) (1 << bitOffset);
+
+          byte value = (byte) (b & mask);
+          if (value != 0) {
+            int entrySize = PNLJOperator.this.getEntrySize(this.leftTableName);
+
+            int offset = PNLJOperator.this.getHeaderSize(this.leftTableName) + (entrySize * this.leftEntryNum);
+            byte[] bytes = this.leftPage.readBytes(offset, entrySize);
+
+            Record toRtn = PNLJOperator.this.getSchema(this.leftTableName).decode(bytes);
+            this.leftEntryNum++;
+            return toRtn;
+          }
+          this.leftEntryNum++;
+        }
+        if (leftIterator.hasNext()) {
+          this.leftEntryNum = 0;
+          this.rightEntryNum = 0;
+          this.leftPage = this.leftIterator.next();
+
+          this.rightIterator = PNLJOperator.this.getPageIterator(this.rightTableName);
+          this.rightIterator.next();
+          this.rightPage = this.rightIterator.next();
+
+          this.leftHeader = PNLJOperator.this.getPageHeader(this.leftTableName, this.leftPage);
+          this.rightHeader = PNLJOperator.this.getPageHeader(this.rightTableName, this.rightPage);
+
+          this.leftRecord = this.getNextLeftRecordInPage();
+          this.rightRecord = this.getNextRightRecordInPage();
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
       return null;
     }
 
     private Record getNextRightRecordInPage() {
       /* TODO */
+      try {
+
+        while (this.rightEntryNum < PNLJOperator.this.getNumEntriesPerPage(this.rightTableName)) {
+          byte b = this.rightHeader[this.rightEntryNum / 8];
+          int bitOffset = 7 - (this.rightEntryNum % 8);
+          byte mask = (byte) (1 << bitOffset);
+
+          byte value = (byte) (b & mask);
+          if (value != 0) {
+            int entrySize = PNLJOperator.this.getEntrySize(this.rightTableName);
+
+            int offset = PNLJOperator.this.getHeaderSize(this.rightTableName) + (entrySize * this.rightEntryNum);
+            byte[] bytes = this.rightPage.readBytes(offset, entrySize);
+
+            Record toRtn = PNLJOperator.this.getSchema(this.rightTableName).decode(bytes);
+            this.rightEntryNum++;
+            return toRtn;
+          }
+          this.rightEntryNum++;
+        }
+        if (rightIterator.hasNext()) {
+          this.rightEntryNum = 0;
+          this.leftEntryNum = 0;
+          this.rightPage = this.rightIterator.next();
+          this.rightHeader = PNLJOperator.this.getPageHeader(this.rightTableName, this.rightPage);
+          this.leftRecord = this.getNextLeftRecordInPage();
+          this.rightRecord = this.getNextRightRecordInPage();
+
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
       return null;
     }
 
@@ -98,6 +216,11 @@ public class PNLJOperator extends JoinOperator {
      */
     public Record next() {
       /* TODO */
+      if (this.hasNext()) {
+        Record r = this.nextRecord;
+        this.nextRecord = null;
+        return r;
+      }
       throw new NoSuchElementException();
     }
 
