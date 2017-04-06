@@ -99,7 +99,7 @@ public class PNLJOperator extends JoinOperator {
       if (this.nextRecord != null) {
         return true;
       }
-      
+
       while (true) {
         if (this.leftRecord == null) {
           this.leftRecord = getNextLeftRecordInPage();
