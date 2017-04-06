@@ -20,11 +20,11 @@ public class PNLJOperator extends JoinOperator {
                       String rightColumnName,
                       Database.Transaction transaction) throws QueryPlanException, DatabaseException {
     super(leftSource,
-          rightSource,
-          leftColumnName,
-          rightColumnName,
-          transaction,
-          JoinType.PNLJ);
+            rightSource,
+            leftColumnName,
+            rightColumnName,
+            transaction,
+            JoinType.PNLJ);
   }
 
   public Iterator<Record> iterator() throws QueryPlanException, DatabaseException {
@@ -99,39 +99,49 @@ public class PNLJOperator extends JoinOperator {
       if (this.nextRecord != null) {
         return true;
       }
-
       while (true) {
-        if (this.leftRecord == null) {
-          this.leftRecord = getNextLeftRecordInPage();
+        if (this.rightRecord == null) {
+          this.leftRecord = this.getNextLeftRecordInPage();
           if (this.leftRecord == null) {
-            return false;
-          } else {
             try {
-              this.rightHeader = PNLJOperator.this.getPageHeader(this.rightTableName, this.rightPage);
-            } catch (DatabaseException e) {
-              e.printStackTrace();
+              if (!rightIterator.hasNext()) {
+                if (leftIterator.hasNext()) {
+                  this.leftPage = this.leftIterator.next();
+                  this.rightIterator = PNLJOperator.this.getPageIterator(this.rightTableName);
+                  this.rightIterator.next();
+                } else {
+                  return false;
+                }
+              } else {
+                this.rightPage = this.rightIterator.next();
+                this.leftEntryNum = 0;
+              }
+            } catch (Exception e) {
+              return false;
             }
           }
-        }
-        DataBox leftJoinValue = this.leftRecord.getValues().get(PNLJOperator.this.getLeftColumnIndex());
-        DataBox rightJoinValue = this.rightRecord.getValues().get(PNLJOperator.this.getRightColumnIndex());
-        if (leftJoinValue.equals(rightJoinValue)) {
-          List<DataBox> leftValues = new ArrayList<DataBox>(this.leftRecord.getValues());
-          List<DataBox> rightValues = new ArrayList<DataBox>(rightRecord.getValues());
-          leftValues.addAll(rightValues);
-          this.nextRecord = new Record(leftValues);
+          this.rightEntryNum = 0;
           this.rightRecord = getNextRightRecordInPage();
-          return true;
         }
-        this.rightRecord = getNextRightRecordInPage();
+        else {
+          DataBox leftJoinValue = this.leftRecord.getValues().get(PNLJOperator.this.getLeftColumnIndex());
+          DataBox rightJoinValue = this.rightRecord.getValues().get(PNLJOperator.this.getRightColumnIndex());
+          if (leftJoinValue.equals(rightJoinValue)) {
+            List<DataBox> leftValues = new ArrayList<DataBox>(this.leftRecord.getValues());
+            List<DataBox> rightValues = new ArrayList<DataBox>(rightRecord.getValues());
+            leftValues.addAll(rightValues);
+            this.nextRecord = new Record(leftValues);
+            this.rightRecord = getNextRightRecordInPage();
+            return true;
+          }
+          this.rightRecord = getNextRightRecordInPage();
+        }
       }
-
     }
 
     private Record getNextLeftRecordInPage() {
       /* TODO */
       try {
-
         while (this.leftEntryNum < PNLJOperator.this.getNumEntriesPerPage(leftTableName)) {
           byte b = this.leftHeader[this.leftEntryNum / 8];
           int bitOffset = 7 - (this.leftEntryNum % 8);
@@ -149,21 +159,6 @@ public class PNLJOperator extends JoinOperator {
             return toRtn;
           }
           this.leftEntryNum++;
-        }
-        if (leftIterator.hasNext()) {
-          this.leftEntryNum = 0;
-          this.rightEntryNum = 0;
-          this.leftPage = this.leftIterator.next();
-
-          this.rightIterator = PNLJOperator.this.getPageIterator(this.rightTableName);
-          this.rightIterator.next();
-          this.rightPage = this.rightIterator.next();
-
-          this.leftHeader = PNLJOperator.this.getPageHeader(this.leftTableName, this.leftPage);
-          this.rightHeader = PNLJOperator.this.getPageHeader(this.rightTableName, this.rightPage);
-
-          this.leftRecord = this.getNextLeftRecordInPage();
-          this.rightRecord = this.getNextRightRecordInPage();
         }
       } catch (Exception e) {
         e.printStackTrace();
@@ -192,15 +187,6 @@ public class PNLJOperator extends JoinOperator {
             return toRtn;
           }
           this.rightEntryNum++;
-        }
-        if (rightIterator.hasNext()) {
-          this.rightEntryNum = 0;
-          this.leftEntryNum = 0;
-          this.rightPage = this.rightIterator.next();
-          this.rightHeader = PNLJOperator.this.getPageHeader(this.rightTableName, this.rightPage);
-          this.leftRecord = this.getNextLeftRecordInPage();
-          this.rightRecord = this.getNextRightRecordInPage();
-
         }
       } catch (Exception e) {
         e.printStackTrace();
