@@ -35,6 +35,7 @@ public class TestIndexScanOperator {
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
 
+
     @Test(timeout=5000)
     public void testIndexScanEqualsRecords() throws QueryPlanException, DatabaseException, IOException {
         File tempDir = tempFolder.newFolder("joinTest");

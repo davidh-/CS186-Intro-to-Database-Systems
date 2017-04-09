@@ -90,8 +90,6 @@ public class PNLJOperator extends JoinOperator {
       this.leftEntryNum = 0;
       this.rightEntryNum = 0;
       this.nextRecord = null;
-      this.leftRecord = getNextLeftRecordInPage();
-      this.rightRecord = getNextRightRecordInPage();
     }
 
     public boolean hasNext() {
@@ -101,34 +99,35 @@ public class PNLJOperator extends JoinOperator {
       }
       while (true) {
         if (this.rightRecord == null) {
-          this.leftRecord = this.getNextLeftRecordInPage();
+          this.leftRecord = getNextLeftRecordInPage();
           if (this.leftRecord == null) {
             try {
               if (!rightIterator.hasNext()) {
                 if (leftIterator.hasNext()) {
                   this.leftPage = this.leftIterator.next();
                   this.rightIterator = PNLJOperator.this.getPageIterator(this.rightTableName);
-                  this.rightIterator.next();
+                  this.rightHeader = PNLJOperator.this.getPageHeader(this.rightTableName, this.rightPage);
                 } else {
                   return false;
                 }
-              } else {
-                this.rightPage = this.rightIterator.next();
-                this.leftEntryNum = 0;
               }
+                this.rightPage = this.rightIterator.next();
+                this.rightHeader = PNLJOperator.this.getPageHeader(this.rightTableName, this.rightPage);
+                this.leftEntryNum = 0;
+                this.leftRecord = this.getNextLeftRecordInPage();
             } catch (Exception e) {
               return false;
             }
           }
           this.rightEntryNum = 0;
-          this.rightRecord = getNextRightRecordInPage();
+          this.rightRecord = this.getNextRightRecordInPage();
         }
         else {
           DataBox leftJoinValue = this.leftRecord.getValues().get(PNLJOperator.this.getLeftColumnIndex());
           DataBox rightJoinValue = this.rightRecord.getValues().get(PNLJOperator.this.getRightColumnIndex());
           if (leftJoinValue.equals(rightJoinValue)) {
             List<DataBox> leftValues = new ArrayList<DataBox>(this.leftRecord.getValues());
-            List<DataBox> rightValues = new ArrayList<DataBox>(rightRecord.getValues());
+            List<DataBox> rightValues = new ArrayList<DataBox>(this.rightRecord.getValues());
             leftValues.addAll(rightValues);
             this.nextRecord = new Record(leftValues);
             this.rightRecord = getNextRightRecordInPage();

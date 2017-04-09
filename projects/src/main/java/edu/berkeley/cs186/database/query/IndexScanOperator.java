@@ -21,6 +21,7 @@ public class IndexScanOperator extends QueryOperator {
 
   private int columnIndex;
 
+
   /**
    * An index scan operator.
    *
@@ -71,9 +72,27 @@ public class IndexScanOperator extends QueryOperator {
    */
   private class IndexScanIterator implements Iterator<Record> {
     /* TODO: Implement the IndexScanIterator */
+    private Iterator<Record> itr;
+    private Record nextRecord;
+
+    private boolean LESS_THAN;
+    private boolean LESS_THAN_EQUALS;
+    private boolean inner_call = false;
 
     public IndexScanIterator() throws QueryPlanException, DatabaseException {
       /* TODO */
+      if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.EQUALS) {
+        itr = transaction.lookupKey(tableName, columnName, value);
+      }
+      else if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.LESS_THAN ||
+              IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.LESS_THAN_EQUALS) {
+        itr = transaction.sortedScan(tableName, columnName);
+        LESS_THAN = true;
+        LESS_THAN_EQUALS = true;
+      }
+      else {
+        itr = transaction.sortedScanFrom(tableName, columnName, value);
+      }
     }
 
     /**
@@ -83,7 +102,62 @@ public class IndexScanOperator extends QueryOperator {
      */
     public boolean hasNext() {
       /* TODO */
-      return false;
+      if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.EQUALS) {
+        if (itr.hasNext()) {
+          if (inner_call) {
+            nextRecord = itr.next();
+          }
+          return true;
+        } else {
+          return false;
+        }
+      }
+      else if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.LESS_THAN) {
+        if (itr.hasNext() && LESS_THAN) {
+          nextRecord = itr.next();
+          if (nextRecord.getValues().get(columnIndex).compareTo(value) >= 0) {
+            LESS_THAN = false;
+          }
+          return true;
+        } else {
+          return false;
+        }
+      }
+      else if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.LESS_THAN_EQUALS) {
+        if (itr.hasNext() && LESS_THAN_EQUALS) {
+          nextRecord = itr.next();
+          if (nextRecord.getValues().get(columnIndex).compareTo(value) > 0) {
+            LESS_THAN = false;
+            nextRecord = null;
+            return false;
+          }
+          return true;
+        } else {
+          return false;
+        }
+      }
+      else if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.GREATER_THAN) {
+        if (itr.hasNext()) {
+          nextRecord = itr.next();
+          return true;
+        } else {
+          return false;
+        }
+      }
+      else {
+        if (itr.hasNext()) {
+          while (itr.hasNext()) {
+            nextRecord = itr.next();
+            if (nextRecord.getValues().get(columnIndex).compareTo(value) > 0) {
+              break;
+            }
+          }
+          return true;
+        } else {
+          return false;
+        }
+      }
+
     }
 
     /**
@@ -94,6 +168,13 @@ public class IndexScanOperator extends QueryOperator {
      */
     public Record next() {
       /* TODO */
+      inner_call = true;
+      if (this.hasNext()) {
+        Record r = this.nextRecord;
+        this.nextRecord = null;
+        inner_call = false;
+        return r;
+      }
       throw new NoSuchElementException();
     }
 
