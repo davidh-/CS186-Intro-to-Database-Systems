@@ -6,6 +6,7 @@ import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.Schema;
 import edu.berkeley.cs186.database.table.stats.TableStats;
+import edu.berkeley.cs186.database.table.stats.Histogram;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -44,14 +45,58 @@ public class IndexScanOperator extends QueryOperator {
     this.setOutputSchema(this.computeSchema());
     columnName = this.checkSchemaForColumn(this.getOutputSchema(), columnName);
     this.columnIndex = this.getOutputSchema().getFieldNames().indexOf(columnName);
+ 
+    this.stats = this.estimateStats();
+    this.cost = this.estimateIOCost();
   }
 
-  public String toString() {
+  public String str() {
     return "type: " + this.getType() +
         "\ntable: " + this.tableName +
         "\ncolumn: " + this.columnName +
         "\noperator: " + this.predicate +
         "\nvalue: " + this.value;
+  }
+
+  /**
+   * Estimates the table statistics for the result of executing this query operator.
+   *
+   * @return estimated TableStats
+   */
+  public TableStats estimateStats() throws QueryPlanException {
+    TableStats stats;
+
+    try {
+      stats = this.transaction.getStats(this.tableName);
+    } catch (DatabaseException de) {
+      throw new QueryPlanException(de);
+    }
+
+    return stats.copyWithPredicate(this.columnIndex,
+                                   this.predicate,
+                                   this.value);
+  }
+
+  /**
+   * Estimates the IO cost of executing this query operator.
+   * You should calculate this estimate cost with the formula
+   * taught to you in class. Note that the index you've implemented
+   * in this project is an unclustered index.
+   *
+   * You will find the following instance variables helpful:
+   * this.transaction, this.tableName, this.columnName,
+   * this.columnIndex, this.predicate, and this.value.
+   *
+   * You will find the following methods helpful: this.transaction.getStats,
+   * this.transaction.getNumRecords, this.transaction.getNumIndexPages,
+   * and tableStats.getReductionFactor.
+   *
+   * @return estimate IO cost
+   * @throws QueryPlanException
+   */
+  public int estimateIOCost() throws QueryPlanException {
+    /* TODO: Implement me! */
+    return -1;
   }
 
   public Iterator<Record> iterator() throws QueryPlanException, DatabaseException {
@@ -70,10 +115,41 @@ public class IndexScanOperator extends QueryOperator {
    * An implementation of Iterator that provides an iterator interface for this operator.
    */
   private class IndexScanIterator implements Iterator<Record> {
-    /* TODO: Implement the IndexScanIterator */
+    private Iterator<Record> sourceIterator;
+    private Record nextRecord;
 
     public IndexScanIterator() throws QueryPlanException, DatabaseException {
-      /* TODO */
+      this.nextRecord = null;
+      if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.EQUALS) {
+        this.sourceIterator = IndexScanOperator.this.transaction.lookupKey(
+                IndexScanOperator.this.tableName,
+                IndexScanOperator.this.columnName,
+                IndexScanOperator.this.value);
+      } else if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.LESS_THAN ||
+              IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.LESS_THAN_EQUALS) {
+        this.sourceIterator = IndexScanOperator.this.transaction.sortedScan(
+                IndexScanOperator.this.tableName,
+                IndexScanOperator.this.columnName);
+      } else if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.GREATER_THAN) {
+        this.sourceIterator = IndexScanOperator.this.transaction.sortedScanFrom(
+                IndexScanOperator.this.tableName,
+                IndexScanOperator.this.columnName,
+                IndexScanOperator.this.value);
+        while (this.sourceIterator.hasNext()) {
+          Record r = this.sourceIterator.next();
+
+          if (r.getValues().get(IndexScanOperator.this.columnIndex)
+                  .compareTo(IndexScanOperator.this.value) > 0) {
+            this.nextRecord = r;
+            break;
+          }
+        }
+      } else if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.GREATER_THAN_EQUALS) {
+        this.sourceIterator = IndexScanOperator.this.transaction.sortedScanFrom(
+                IndexScanOperator.this.tableName,
+                IndexScanOperator.this.columnName,
+                IndexScanOperator.this.value);
+      }
     }
 
     /**
@@ -82,7 +158,36 @@ public class IndexScanOperator extends QueryOperator {
      * @return true if this iterator has another record to yield, otherwise false
      */
     public boolean hasNext() {
-      /* TODO */
+      if (this.nextRecord != null) {
+        return true;
+      }
+      if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.LESS_THAN) {
+        if (this.sourceIterator.hasNext()) {
+          Record r = this.sourceIterator.next();
+          if (r.getValues().get(IndexScanOperator.this.columnIndex)
+                  .compareTo(IndexScanOperator.this.value) >= 0) {
+            return false;
+          }
+          this.nextRecord = r;
+          return true;
+        }
+        return false;
+      } else if (IndexScanOperator.this.predicate == QueryPlan.PredicateOperator.LESS_THAN_EQUALS) {
+        if (this.sourceIterator.hasNext()) {
+          Record r = this.sourceIterator.next();
+          if (r.getValues().get(IndexScanOperator.this.columnIndex)
+                  .compareTo(IndexScanOperator.this.value) > 0) {
+            return false;
+          }
+          this.nextRecord = r;
+          return true;
+        }
+        return false;
+      }
+      if (this.sourceIterator.hasNext()) {
+        this.nextRecord = this.sourceIterator.next();
+        return true;
+      }
       return false;
     }
 
@@ -93,7 +198,11 @@ public class IndexScanOperator extends QueryOperator {
      * @throws NoSuchElementException if there are no more Records to yield
      */
     public Record next() {
-      /* TODO */
+      if (this.hasNext()) {
+        Record r = this.nextRecord;
+        this.nextRecord = null;
+        return r;
+      }
       throw new NoSuchElementException();
     }
 
