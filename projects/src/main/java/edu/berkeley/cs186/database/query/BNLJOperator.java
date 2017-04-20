@@ -198,7 +198,7 @@ public class BNLJOperator extends JoinOperator {
             byte mask = (byte) (1 << bitOffset);
             byte value = (byte) (b & mask);
             if (value != 0) {
-              int entrySize = BNLJOperator.this.getEntrySize(this.rightTableName);
+              int entrySize = BNLJOperator.this.getEntrySize(this.leftTableName);
               int offset = BNLJOperator.this.getHeaderSize(this.leftTableName) + (entrySize * this.leftEntryNum);
               byte[] bytes = this.leftPage.readBytes(offset, entrySize);
               Record toRtn = BNLJOperator.this.getLeftSource().getOutputSchema().decode(bytes);
