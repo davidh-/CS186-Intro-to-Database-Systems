@@ -55,7 +55,7 @@ public class TestIntHistogram {
     assertEquals(1, histogram.getAllBuckets().get(9).getCount());
   }
 
-  @Test(timeout=1000)
+  @Test(timeout=100000)
   public void testIntComputeReductionFactor() {
     IntHistogram histogram = new IntHistogram();
 
@@ -67,10 +67,7 @@ public class TestIntHistogram {
     assertEquals(50, histogram.getNumDistinct());
 
     IntDataBox equalsValue = new IntDataBox(3);
-    assertEquals(0.02f,
-                 histogram.computeReductionFactor(PredicateOperator.EQUALS,
-                                                  equalsValue),
-                 0.001f);
+    assertEquals(0.02f, histogram.computeReductionFactor(PredicateOperator.EQUALS, equalsValue), 0.001f);
 
     IntDataBox lessThanValue = new IntDataBox(25);
     assertEquals(0.5,

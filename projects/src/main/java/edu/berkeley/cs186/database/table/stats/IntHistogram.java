@@ -201,14 +201,14 @@ public class IntHistogram implements Histogram<Integer>{
   public float computeReductionFactor(PredicateOperator predicate,
                                       DataBox value) {
     /* TODO: Implement me! */
-    int numDistEntries = this.getNumDistinct();
+    float numDistEntries = this.getNumDistinct();
     int val = value.getInt();
     int max = this.getMaxValue();
     int min = this.getMinValue();
-    int diffMaxMin = max - min;
+    float diffMaxMin = max - min;
 
     if (predicate == PredicateOperator.EQUALS) {
-      return 1 / numDistEntries;
+      return (1 / numDistEntries);
     } else if (predicate == PredicateOperator.LESS_THAN) {
       return (val - min) / diffMaxMin;
     } else if (predicate == PredicateOperator.LESS_THAN_EQUALS) {
