@@ -96,7 +96,24 @@ public class IndexScanOperator extends QueryOperator {
    */
   public int estimateIOCost() throws QueryPlanException {
     /* TODO: Implement me! */
-    return -1;
+    Database.Transaction trans = this.transaction;
+    String tableName = this.tableName;
+    String columnName = this.columnName;
+    int colIndex = this.columnIndex;
+    TableStats tableStats;
+    float redFactor = 1;
+    float numPages = 0;
+    long numRecs = 0;
+    try {
+      tableStats = trans.getStats(tableName);
+      redFactor = tableStats.getReductionFactor(colIndex, this.predicate, this.value);
+      numPages = trans.getNumIndexPages(tableName, columnName);
+      numRecs = trans.getNumRecords(tableName);
+    } catch (DatabaseException e) {
+      e.printStackTrace();
+    }
+    double result = Math.ceil( redFactor * (numPages+numRecs));
+    return (int) result;
   }
 
   public Iterator<Record> iterator() throws QueryPlanException, DatabaseException {

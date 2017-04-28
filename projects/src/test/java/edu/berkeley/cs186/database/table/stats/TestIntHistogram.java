@@ -3,6 +3,7 @@ package edu.berkeley.cs186.database.table.stats;
 import edu.berkeley.cs186.database.StudentTest;
 import edu.berkeley.cs186.database.StudentTestP2;
 
+import edu.berkeley.cs186.database.StudentTestP4;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -129,5 +130,99 @@ public class TestIntHistogram {
 
     assertEquals(320, copyHistogram.getEntriesInRange(0, 500));
     assertEquals(250, copyHistogram.getNumDistinct());
+  }
+  @Test(timeout=100000)
+  @Category(StudentTestP4.class)
+  public void testIntComputeReductionFactorLargeValuesWithEquals() {
+    IntHistogram histogram = new IntHistogram();
+
+    for (int i = 0; i < 1000; i++) {
+      histogram.addValue(i);
+      histogram.addValue(i);
+    }
+
+    assertEquals(1000, histogram.getNumDistinct());
+
+    IntDataBox equalsValue = new IntDataBox(3);
+    assertEquals(0.001f, histogram.computeReductionFactor(PredicateOperator.EQUALS, equalsValue), 0.001f);
+
+  }
+  @Test(timeout=100000)
+  @Category(StudentTestP4.class)
+  public void testIntComputeReductionFactorLargeValuesWithLessThan() {
+    IntHistogram histogram = new IntHistogram();
+
+    for (int i = 0; i < 1000; i++) {
+      histogram.addValue(i);
+      histogram.addValue(i);
+    }
+
+    assertEquals(1000, histogram.getNumDistinct());
+
+
+    IntDataBox lessThanValue = new IntDataBox(25);
+    assertEquals(0.019,
+            histogram.computeReductionFactor(PredicateOperator.LESS_THAN,
+                    lessThanValue),
+            0.001f);
+
+
+  }
+  @Test(timeout=100000)
+  @Category(StudentTestP4.class)
+  public void testIntComputeReductionFactorLargeValuesWithLessThanEquals() {
+    IntHistogram histogram = new IntHistogram();
+
+    for (int i = 0; i < 1000; i++) {
+      histogram.addValue(i);
+      histogram.addValue(i);
+    }
+
+    assertEquals(1000, histogram.getNumDistinct());
+
+    IntDataBox lessThanEqualsValue = new IntDataBox(25);
+    assertEquals(0.02,
+            histogram.computeReductionFactor(PredicateOperator.LESS_THAN_EQUALS,
+                    lessThanEqualsValue),
+            0.001f);
+
+
+  }
+  @Test(timeout=100000)
+  @Category(StudentTestP4.class)
+  public void testIntComputeReductionFactorLargeValuesWithGreaterThan() {
+    IntHistogram histogram = new IntHistogram();
+
+    for (int i = 0; i < 1000; i++) {
+      histogram.addValue(i);
+      histogram.addValue(i);
+    }
+
+    assertEquals(1000, histogram.getNumDistinct());
+
+    IntDataBox greaterThanValue = new IntDataBox(9);
+    assertEquals(0.993,
+            histogram.computeReductionFactor(PredicateOperator.GREATER_THAN,
+                    greaterThanValue),
+            0.001f);
+
+  }
+  @Test(timeout=100000)
+  @Category(StudentTestP4.class)
+  public void testIntComputeReductionFactorLargeValuesWithGreaterThanEquals() {
+    IntHistogram histogram = new IntHistogram();
+
+    for (int i = 0; i < 1000; i++) {
+      histogram.addValue(i);
+      histogram.addValue(i);
+    }
+
+    assertEquals(1000, histogram.getNumDistinct());
+
+    IntDataBox greaterThanEqualsValue = new IntDataBox(10);
+    assertEquals(0.993,
+            histogram.computeReductionFactor(PredicateOperator.GREATER_THAN_EQUALS,
+                    greaterThanEqualsValue),
+            0.001f);
   }
 }

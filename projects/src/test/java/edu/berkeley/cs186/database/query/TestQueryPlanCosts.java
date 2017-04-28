@@ -1,5 +1,6 @@
 package edu.berkeley.cs186.database.query;
 
+import edu.berkeley.cs186.database.*;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.Rule;
@@ -13,18 +14,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-import edu.berkeley.cs186.database.TestUtils;
-
-import edu.berkeley.cs186.database.Database;
-import edu.berkeley.cs186.database.DatabaseException;
 import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.databox.IntDataBox;
 import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.Schema;
 import edu.berkeley.cs186.database.query.QueryPlan.PredicateOperator;
 import edu.berkeley.cs186.database.table.stats.StringHistogram;
-import edu.berkeley.cs186.database.StudentTest;
-import edu.berkeley.cs186.database.StudentTestP2;
 
 import static org.junit.Assert.*;
 
@@ -196,5 +191,162 @@ public class TestQueryPlanCosts {
 
     JoinOperator rightJoinLeft = new GraceHashOperator(right, left, "int", "int", transaction);
     assertEquals(66, rightJoinLeft.estimateIOCost());
+  }
+  @Test(timeout=10000)
+  @Category(StudentTestP4.class)
+  public void testIndexScanOperatorCostLargeNumValues() throws DatabaseException, QueryPlanException {
+    List<String> intTableNames = new ArrayList<String>();
+    intTableNames.add("int");
+
+    List<DataBox> intTableTypes = new ArrayList<DataBox>();
+    intTableTypes.add(new IntDataBox());
+
+    String tableName = "tempIntTable";
+
+    this.database.createTableWithIndices(
+            new Schema(intTableNames, intTableTypes), tableName, intTableNames);
+
+    Database.Transaction transaction = this.database.beginTransaction();
+
+    for (int i = 0; i < 300*10; i++) {
+      List<DataBox> values = new ArrayList<DataBox>();
+      values.add(new IntDataBox(i));
+
+      transaction.addRecord(tableName, values);
+    }
+
+    QueryOperator indexScanOperator;
+
+    indexScanOperator = new IndexScanOperator(
+            transaction, tableName, "int", PredicateOperator.GREATER_THAN_EQUALS, new IntDataBox(200));
+
+    assertEquals(2829, indexScanOperator.estimateIOCost());
+
+    for (int i = 0; i < 700*10; i++) {
+      List<DataBox> values = new ArrayList<DataBox>();
+      values.add(new IntDataBox(i));
+
+      transaction.addRecord(tableName, values);
+    }
+
+    indexScanOperator = new IndexScanOperator(
+            transaction, tableName, "int", PredicateOperator.GREATER_THAN_EQUALS, new IntDataBox(500));
+
+    assertEquals(9386, indexScanOperator.estimateIOCost());
+
+    transaction.end();
+  }
+
+
+  @Test(timeout=2000)
+  @Category(StudentTestP4.class)
+  public void testSNLJOperatorCostLargeNumValues() throws DatabaseException, QueryPlanException {
+    List<DataBox> values = TestUtils.createRecordWithAllTypes().getValues();
+    this.database.createTable(TestUtils.createSchemaWithAllTypes(), "tempIntTable1");
+    this.database.createTable(TestUtils.createSchemaWithAllTypes(), "tempIntTable2");
+
+    Database.Transaction transaction = this.database.beginTransaction();
+    int numEntries = transaction.getNumEntriesPerPage("tempIntTable1");
+
+    for (int i = 0; i < 2*10 * numEntries; i++) {
+      transaction.addRecord("tempIntTable1", values);
+    }
+    for (int i = 0; i < 4*10 * numEntries; i++) {
+      transaction.addRecord("tempIntTable2", values);
+    }
+
+    QueryOperator left = new SequentialScanOperator(transaction, "tempIntTable1");
+    QueryOperator right = new SequentialScanOperator(transaction, "tempIntTable2");
+
+    JoinOperator leftJoinRight = new SNLJOperator(left, right, "int", "int", transaction);
+    assertEquals(230420, leftJoinRight.estimateIOCost());
+
+    JoinOperator rightJoinLeft = new SNLJOperator(right, left, "int", "int", transaction);
+    assertEquals(230440, rightJoinLeft.estimateIOCost());
+  }
+
+
+
+  @Test(timeout=5000)
+  @Category(StudentTestP4.class)
+  public void testPNLJOperatorCostLargeNumValues() throws DatabaseException, QueryPlanException {
+    List<DataBox> values = TestUtils.createRecordWithAllTypes().getValues();
+    this.database.createTable(TestUtils.createSchemaWithAllTypes(), "tempIntTable1");
+    this.database.createTable(TestUtils.createSchemaWithAllTypes(), "tempIntTable2");
+
+    Database.Transaction transaction = this.database.beginTransaction();
+    int numEntries = transaction.getNumEntriesPerPage("tempIntTable1");
+
+    for (int i = 0; i < 2*100 * numEntries; i++) {
+      transaction.addRecord("tempIntTable1", values);
+    }
+    for (int i = 0; i < 3*100 * numEntries + 10; i++) {
+      transaction.addRecord("tempIntTable2", values);
+    }
+
+    QueryOperator left = new SequentialScanOperator(transaction, "tempIntTable1");
+    QueryOperator right = new SequentialScanOperator(transaction, "tempIntTable2");
+
+    JoinOperator leftJoinRight = new PNLJOperator(left, right, "int", "int", transaction);
+    assertEquals(60400, leftJoinRight.estimateIOCost());
+
+    JoinOperator rightJoinLeft = new PNLJOperator(right, left, "int", "int", transaction);
+    assertEquals(60501, rightJoinLeft.estimateIOCost());
+  }
+
+
+  @Test(timeout=2000)
+  @Category(StudentTestP4.class)
+  public void testBNLJOperatorCostLargeNumValues() throws DatabaseException, QueryPlanException {
+    List<DataBox> values = TestUtils.createRecordWithAllTypes().getValues();
+    this.database.createTable(TestUtils.createSchemaWithAllTypes(), "tempIntTable1");
+    this.database.createTable(TestUtils.createSchemaWithAllTypes(), "tempIntTable2");
+
+    Database.Transaction transaction = this.database.beginTransaction();
+    int numEntries = transaction.getNumEntriesPerPage("tempIntTable1");
+
+    for (int i = 0; i < 17*10 * numEntries + 100; i++) {
+      transaction.addRecord("tempIntTable1", values);
+    }
+    for (int i = 0; i < 4*10 * numEntries; i++) {
+      transaction.addRecord("tempIntTable2", values);
+    }
+
+    QueryOperator left = new SequentialScanOperator(transaction, "tempIntTable1");
+    QueryOperator right = new SequentialScanOperator(transaction, "tempIntTable2");
+
+    JoinOperator leftJoinRight = new BNLJOperator(left, right, "int", "int", transaction);
+    assertEquals(2451, leftJoinRight.estimateIOCost());
+
+    JoinOperator rightJoinLeft = new BNLJOperator(right, left, "int", "int", transaction);
+    assertEquals(2434, rightJoinLeft.estimateIOCost());
+  }
+
+
+  @Test(timeout=7000)
+  @Category(StudentTestP4.class)
+  public void testGraceHashOperatorCostLargeNumValues() throws DatabaseException, QueryPlanException {
+    List<DataBox> values = TestUtils.createRecordWithAllTypes().getValues();
+    this.database.createTable(TestUtils.createSchemaWithAllTypes(), "tempIntTable1");
+    this.database.createTable(TestUtils.createSchemaWithAllTypes(), "tempIntTable2");
+
+    Database.Transaction transaction = this.database.beginTransaction();
+    int numEntries = transaction.getNumEntriesPerPage("tempIntTable1");
+
+    for (int i = 0; i < 18*100 * numEntries; i++) {
+      transaction.addRecord("tempIntTable1", values);
+    }
+    for (int i = 0; i < 3*100 * numEntries + 287; i++) {
+      transaction.addRecord("tempIntTable2", values);
+    }
+
+    QueryOperator left = new SequentialScanOperator(transaction, "tempIntTable1");
+    QueryOperator right = new SequentialScanOperator(transaction, "tempIntTable2");
+
+    JoinOperator leftJoinRight = new GraceHashOperator(left, right, "int", "int", transaction);
+    assertEquals(6303, leftJoinRight.estimateIOCost());
+
+    JoinOperator rightJoinLeft = new GraceHashOperator(right, left, "int", "int", transaction);
+    assertEquals(6303, rightJoinLeft.estimateIOCost());
   }
 }

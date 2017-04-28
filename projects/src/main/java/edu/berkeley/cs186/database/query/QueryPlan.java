@@ -259,6 +259,20 @@ public class QueryPlan {
    */
   private QueryOperator pushDownSelects(QueryOperator source, int except) throws QueryPlanException, DatabaseException {
     /* TODO: Implement me! */
+    for (int i = 0; i < this.selectColumnNames.size(); i++) {
+      if (i != except) {
+        String columnName = this.selectColumnNames.get(i);
+        PredicateOperator op = this.selectOperators.get(i);
+        DataBox value = this.selectDataBoxes.get(i);
+        try {
+          source = new SelectOperator(source, columnName, op, value);
+        } catch (QueryPlanException e) {
+          i++;
+          continue;
+        }
+
+      }
+    }
     return source;
   }
 
@@ -280,12 +294,25 @@ public class QueryPlan {
 
     // Find the cost of a sequential scan of the table
     // TODO: Implement me!
-
+    minOp = new SequentialScanOperator(transaction, table);
+    int minCost = minOp.getIOCost();
     // For each eligible index column, find the cost of an index scan of the
     // table and retain the lowest cost operator
     // TODO: Implement me!
     List<Integer> selectIndices = this.getEligibleIndexColumns(table);
     int minSelectIdx = -1;
+    for (int i : selectIndices) {
+      String columnName = selectColumnNames.get(i);
+      PredicateOperator predOp = this.selectOperators.get(i);
+      DataBox value = this.selectDataBoxes.get(i);
+      IndexScanOperator indexScanOp = new IndexScanOperator(transaction, table, columnName, predOp, value);
+      int curCost = indexScanOp.getIOCost();
+      if (curCost < minCost) {
+        minOp = indexScanOp;
+        minCost = curCost;
+        minSelectIdx = i;
+      }
+    }
 
     // Push down SELECT predicates that apply to this table and that were not
     // used for an index scan
@@ -308,6 +335,28 @@ public class QueryPlan {
                                                                    DatabaseException {
     QueryOperator minOp = null;
     /* TODO: Implement me! */
+    minOp = new SNLJOperator(leftOp, rightOp, leftColumn, rightColumn, transaction);
+    int minCost = minOp.getIOCost();
+
+    QueryOperator PNLJ = new PNLJOperator(leftOp, rightOp, leftColumn, rightColumn, transaction);
+    int PNLJCost = PNLJ.getIOCost();
+    QueryOperator BNLJ = new BNLJOperator(leftOp, rightOp, leftColumn, rightColumn, transaction);
+    int BNLJCost = BNLJ.getIOCost();
+    QueryOperator GRACEHASH = new GraceHashOperator(leftOp, rightOp, leftColumn, rightColumn, transaction);
+    int GRACEHASHCost = GRACEHASH.getIOCost();
+
+    if(PNLJCost < minCost) {
+      minOp = PNLJ;
+      minCost = PNLJCost;
+    }
+    if(BNLJCost < minCost) {
+      minOp = BNLJ;
+      minCost = BNLJCost;
+    }
+    if(GRACEHASHCost < minCost) {
+      minOp = GRACEHASH;
+      minCost = GRACEHASHCost;
+    }
     return minOp;
   }
 
@@ -328,6 +377,44 @@ public class QueryPlan {
                                                                                         DatabaseException {
     Map<Set, QueryOperator> map = new HashMap<Set, QueryOperator>();
     /* TODO: Implement me! */
+    for(Set tableSet: prevMap.keySet()) {
+      for (int i = 0 ; i < joinTableNames.size(); i++) {
+
+        String leftColumn = joinLeftColumnNames.get(i);
+        String rightColumn = joinRightColumnNames.get(i);
+
+        String leftTable = leftColumn.split("\\.")[0];
+        String rightTable = joinTableNames.get(i);
+
+        Set<String> tables = new TreeSet<String>();
+        QueryOperator leftOp = prevMap.get(tableSet);;
+        QueryOperator rightOp;
+        QueryOperator lowestOp;
+
+        boolean hasLeftTable = tableSet.contains(leftTable);
+        boolean hasRightTable = tableSet.contains(rightTable);
+
+        if (!hasLeftTable && hasRightTable) {
+          tables.add(leftTable);
+          rightOp = pass1Map.get(tables);
+          lowestOp = minCostJoinType(leftOp, rightOp, rightColumn, leftColumn);
+        }
+        else if (hasLeftTable && !hasRightTable) {
+          tables.add(rightTable);
+          rightOp = pass1Map.get(tables);
+          lowestOp = minCostJoinType(leftOp, rightOp, leftColumn, rightColumn);
+        }
+        else {
+          continue;
+        }
+
+        tables.addAll(tableSet);
+        QueryOperator curOp = map.get(tables);
+        if (curOp == null || lowestOp.getIOCost() < curOp.getIOCost()) {
+          map.put(tables, lowestOp);
+        }
+      }
+    }
     return map;
   }
 

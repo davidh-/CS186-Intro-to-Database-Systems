@@ -5,6 +5,7 @@ import edu.berkeley.cs186.database.DatabaseException;
 import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.io.Page;
 import edu.berkeley.cs186.database.table.Record;
+import edu.berkeley.cs186.database.table.stats.TableStats;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -33,7 +34,12 @@ public class BNLJOperator extends JoinOperator {
 
   public int estimateIOCost() throws QueryPlanException {
     /* TODO: Implement me! */
-    return -1;
+    TableStats leftTableStats = this.getLeftSource().getStats();
+    TableStats rightTableStats = this.getRightSource().getStats();
+    double numPagesLeft = leftTableStats.getNumPages();
+    double numPagesRight = rightTableStats.getNumPages();
+    double numBlocksLeft = Math.ceil(numPagesLeft/(this.numBuffers-2));
+    return (int) (numPagesLeft + (numBlocksLeft*numPagesRight));
   }
 
 
